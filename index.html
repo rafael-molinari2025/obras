@@ -129,6 +129,7 @@
   .kv b{color:var(--txt);font-variant-numeric:tabular-nums}
   .so{display:none}
   .fis-in{width:72px;padding:5px 6px;text-align:right}
+  .orc-in{width:130px;padding:5px 8px;text-align:right}
   @media(max-width:760px){
     header{padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top))}
     header h1 .t{display:none}
@@ -680,7 +681,7 @@ function renderOrc(o,c){
     const r=c.porEtapa[e.id]||0;tO+=e.orcado||0;tR+=r;const d=(e.orcado||0)-r;
     return `<tr>
       <td><span class="noprint"><button class="sm link" onclick="moveEtapa(${i},-1)" title="Subir" ${i?'':'disabled'}>▲</button><button class="sm link" onclick="moveEtapa(${i},1)" title="Descer" ${i<o.etapas.length-1?'':'disabled'}>▼</button></span> ${esc(e.nome)}</td>
-      <td class="n">${fmt(e.orcado)}</td><td class="n">${c.orc?pct((e.orcado||0)/c.orc):'—'}</td>
+      <td class="n"><input class="orc-in" inputmode="decimal" value="${e.orcado?fmtN(e.orcado):''}" placeholder="0,00" onfocus="this.select()" onchange="setOrcado('${esc(e.id)}',this.value)" aria-label="Valor orçado de ${esc(e.nome)}"></td><td class="n">${c.orc?pct((e.orcado||0)/c.orc):'—'}</td>
       <td class="n">${fmt(r)}</td><td class="n ${d<0?'neg':'pos'}">${fmt(d)}</td>
       <td>${bar(e.orcado?r/e.orcado:(r?2:0))}</td>
       <td class="n"><input class="fis-in" inputmode="decimal" value="${(e.fisico||0).toLocaleString('pt-BR')}" onchange="setFisico('${esc(e.id)}',this.value)" aria-label="Avanço físico de ${esc(e.nome)}">%</td>
@@ -697,7 +698,7 @@ function renderOrc(o,c){
     ${sem?`<tr><td class="mut">Sem etapa definida</td><td class="n">—</td><td></td><td class="n">${fmt(sem)}</td><td class="n neg">${fmt(-sem)}</td><td></td><td></td><td class="hm"></td><td class="noprint"></td></tr>`:''}
     <tr class="total"><td>TOTAL</td><td class="n">${fmt(tO)}</td><td class="n">100%</td><td class="n">${fmt(tR)}</td><td class="n ${tO-tR>=0?'pos':'neg'}">${fmt(tO-tR)}</td><td>${bar(tO?tR/tO:0)}</td><td class="n">${pct(c.fis)}</td><td class="hm"></td><td class="noprint"></td></tr>
     </tbody></table>
-    <p class="hint">Atualize o avanço físico (%) de cada etapa conforme a medição em campo — ele alimenta a projeção de custo final e a comparação físico × financeiro.</p></div></div>`;
+    <p class="hint">O orçamento total é a soma do valor orçado de cada etapa: digite os valores direto na coluna Orçado. Atualize o avanço físico (%) de cada etapa conforme a medição em campo — ele alimenta a projeção de custo final e a comparação físico × financeiro.</p></div></div>`;
 }
 
 function renderContas(){
@@ -881,6 +882,10 @@ function delEtapa(){
   o.lanc.forEach(l=>{if(l.etapaId===e.id){l.etapaId='';l.u=t;}});
   data.del[e.id]=t;o.etapas=o.etapas.filter(x=>x!==e);
   dlgEtapa.close();commit();toast('Etapa excluída');
+}
+function setOrcado(id,v){
+  const o=curObra();const e=o.etapas.find(x=>x.id===id);if(!e)return;
+  e.orcado=Math.max(0,cents(v));e.u=Date.now();commit();
 }
 function setFisico(id,v){
   const o=curObra();const e=o.etapas.find(x=>x.id===id);if(!e)return;
