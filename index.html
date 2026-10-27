@@ -196,7 +196,8 @@
   </div>
   <div class="actions">
     <span class="sync" id="syncSt"><span class="dot"></span><span id="syncTxt">Sincronizado</span></span>
-    <button class="primary hide-m" onclick="openLanc()">+ Lançamento</button>
+    <button class="hide-m" onclick="openLanc(null,null,'e')" title="Dinheiro que entra na obra: saldo inicial, aporte, parcela do cliente">+ Entrada</button>
+    <button class="primary hide-m" onclick="openLanc(null,null,'s')" title="Gasto da obra: material, mão de obra…">+ Saída</button>
     <button onclick="openObra()">+ Obra</button>
     <button onclick="logout()">Sair</button>
   </div>
@@ -320,7 +321,7 @@ const TABLE='obras_data';
 const CACHE_PREFIX='obras_cache_v1_';
 
 const CATS_S=['Material','Mão de obra','Equipamentos / locação','Serviços terceirizados','Projetos e taxas','Transporte / frete','Administração','Outros'];
-const CATS_E=['Medição / parcela do contrato','Aporte do cliente','Financiamento','Outros'];
+const CATS_E=['Recurso disponível / saldo inicial','Medição / parcela do contrato','Aporte do cliente','Recursos próprios','Financiamento','Outros'];
 const ETAPAS_PADRAO=['Serviços preliminares','Fundação','Estrutura','Alvenaria','Cobertura','Instalações elétricas','Instalações hidrossanitárias','Esquadrias','Revestimentos','Pisos','Pintura','Louças e metais','Limpeza e entrega'];
 const STATUS_OBRA={plan:'Planejamento',and:'Em andamento',pausa:'Pausada',conc:'Concluída'};
 const SERIES=['#3987e5','#d95926','#199e70','#c98500','#d55181','#008300','#9085e9','#e66767'];
@@ -591,7 +592,7 @@ function renderPainel(o,c){
     ${card('Saldo do orçamento',fmt(c.saldoOrc),c.saldoOrc>=0?'pos':'neg',c.orc?`${pct(c.fin)} do orçamento consumido`:'Defina o orçamento por etapa')}
     ${card('Custo projetado ao final',c.eac!==null?fmt(c.eac):'—',c.eac!==null&&c.orc&&c.eac>c.orc?'neg':'',c.eac!==null?`Desvio ${fmt(c.eac-c.orc)} vs. orçado`:'Disponível a partir de 5% de avanço físico')}
     ${card('Recebido do cliente',fmt(c.rec),'pos',`A receber ${fmt(c.arec)}${c.contrato?` · contrato ${fmt(c.contrato)}`:''}`)}
-    ${card('Caixa da obra',fmt(c.caixa),c.caixa>=0?'pos':'neg','Recebido − pago')}
+    ${card('Saldo disponível',fmt(c.caixa),c.caixa>=0?'pos':'neg',`Entradas recebidas − pagamentos · previsto ${fmt(c.caixa+c.arec-c.pend)}`)}
     ${card('Margem prevista',c.margem!==null?fmt(c.margem):'—',c.margem===null?'':c.margem>=0?'pos':'neg',c.margem!==null&&c.contrato?`${pct(c.margem/c.contrato)} do contrato`:'Informe o valor do contrato na obra')}
     ${card('Contas vencidas',fmt(c.venc),c.nVenc?'neg':'pos',`${c.nVenc} vencida(s) · ${c.nProx} vencem em 7 dias`)}
   </div>
@@ -655,7 +656,7 @@ function filtered(o){
 function renderLanc(o){
   const v=$('v-lanc');
   if(!v.querySelector('.filters')){
-    v.innerHTML=`<div class="panel"><h3>Lançamentos da obra <span class="actions noprint"><button class="sm" onclick="exportCSV()">⬇ CSV</button><button class="sm primary" onclick="openLanc()">+ Lançamento</button></span></h3>
+    v.innerHTML=`<div class="panel"><h3>Lançamentos da obra <span class="actions noprint"><button class="sm" onclick="exportCSV()">⬇ CSV</button><button class="sm" onclick="openLanc(null,null,'e')">+ Entrada</button><button class="sm primary" onclick="openLanc(null,null,'s')">+ Saída</button></span></h3>
     <div class="filters">
       <input class="q" id="fQ" placeholder="🔎 Buscar descrição, fornecedor, NF…" oninput="filt.q=this.value;renderLancBody()">
       <select id="fTipo" onchange="filt.tipo=this.value;renderLancBody()"><option value="">Saídas e entradas</option><option value="s">Só saídas</option><option value="e">Só entradas</option></select>
@@ -703,6 +704,7 @@ function renderContas(){
   const t=today();
   const src=contasTodas?data.obras:[curObra()];
   const all=src.flatMap(o=>o.lanc.filter(l=>l.status==='pend'));
+  const caixa=src.reduce((s,o)=>s+calc(o).caixa,0);
   const pag=all.filter(l=>l.tipo!=='e').sort((a,b)=>(a.venc||'9').localeCompare(b.venc||'9'));
   const rec=all.filter(l=>l.tipo==='e').sort((a,b)=>(a.venc||'9').localeCompare(b.venc||'9'));
   const sum=a=>a.reduce((s,l)=>s+l.valor,0);
@@ -713,7 +715,14 @@ function renderContas(){
       <td class="noprint"><button class="sm primary" onclick="baixar('${esc(ob.id)}','${esc(l.id)}')">${tipo==='e'?'Receber':'Pagar'}</button></td></tr>`;}).join('')}
       <tr class="total"><td colspan="${contasTodas?4:3}">TOTAL</td><td class="n">${fmt(sum(rows))}</td><td class="hm"></td><td class="noprint"></td></tr></tbody></table>`:'<p class="hint">Nada pendente. 🎉</p>';
   $('v-contas').innerHTML=`<p class="noprint" style="margin-bottom:12px"><label style="display:flex;gap:8px;align-items:center;color:var(--txt);font-size:13px"><input type="checkbox" style="width:auto" ${contasTodas?'checked':''} onchange="contasTodas=this.checked;renderContas()"> Mostrar contas de todas as obras</label></p>
+  <div class="noprint" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="openLanc(null,null,'e')">+ Entrada de recurso</button>
+    <button onclick="openLanc(null,null,'e',true)">+ Conta a receber</button>
+    <button class="primary" onclick="openLanc(null,null,'s',true)">+ Conta a pagar</button>
+  </div>
   <div class="cards">
+    ${card('Saldo disponível',fmt(caixa),caixa>=0?'pos':'neg','Entradas recebidas − pagamentos')}
+    ${card('Saldo previsto',fmt(caixa+sum(rec)-sum(pag)),caixa+sum(rec)-sum(pag)>=0?'pos':'neg','Disponível + a receber − a pagar')}
     ${card('A pagar',fmt(sum(pag)),'neg',`${pag.length} conta(s)`)}
     ${card('Vencidas',fmt(sum(vencidas)),vencidas.length?'neg':'pos',`${vencidas.length} conta(s)`)}
     ${card('Vencem em 7 dias',fmt(sum(semana)),semana.length?'warn':'',`${semana.length} conta(s)`)}
@@ -906,13 +915,14 @@ function lancCalc(){
   lancShowTotal();
 }
 function lancShowTotal(){$('lTotal').textContent=fmt(cents($('lValor').value));}
-function openLanc(id,oid){
+// tipo/pend pre-fill a new entry: tipo 'e' = entrada, 's' = saída; pend opens it as a pending bill.
+function openLanc(id,oid,tipo,pend){
   if(oid&&oid!==sel)selectObra(oid);
   const o=curObra();
   if(!o){toast('Cadastre uma obra primeiro',true);openObra();return;}
   const l=id?o.lanc.find(x=>x.id===id):null;editLanc=l?l.id:null;lancManual=false;
-  $('lTitle').textContent=l?'Editar lançamento':'Novo lançamento';
-  document.querySelector(`input[name=lTipo][value=${l&&l.tipo==='e'?'e':'s'}]`).checked=true;
+  document.querySelector(`input[name=lTipo][value=${(l?l.tipo:tipo)==='e'?'e':'s'}]`).checked=true;
+  $('lTitle').textContent=l?'Editar lançamento':tipo==='e'?(pend?'Nova conta a receber':'Nova entrada de recurso'):(pend?'Nova conta a pagar':'Novo lançamento');
   lancTipoChanged();
   $('lEtapa').innerHTML='<option value="">— Sem etapa —</option>'+o.etapas.map(e=>`<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('');
   const forns=[...new Set(data.obras.flatMap(x=>x.lanc.map(y=>y.forn)).filter(Boolean))].sort();
@@ -923,7 +933,7 @@ function openLanc(id,oid){
   $('lForn').value=l?l.forn||'':'';
   $('lQtd').value=l&&l.qtd?l.qtd.toLocaleString('pt-BR'):'';$('lUn').value=l?l.un||'':'';
   $('lUnit').value=l&&l.unit?fmtN(l.unit):'';$('lValor').value=l?fmtN(l.valor):'';
-  $('lStatus').value=l?l.status:'pago';$('lVenc').value=l?l.venc||'':'';$('lPg').value=l?l.pg||'':'';
+  $('lStatus').value=l?l.status:pend?'pend':'pago';$('lVenc').value=l?l.venc||'':'';$('lPg').value=l?l.pg||'':'';
   $('lForma').value=l?l.forma||'':'';$('lDoc').value=l?l.doc||'':'';$('lObs').value=l?l.obs||'':'';
   $('lDel').hidden=!l;$('lDup').hidden=!l;$('lNext').hidden=!!l;$('lErr').textContent='';
   lancStatusChanged();lancShowTotal();
