@@ -516,9 +516,10 @@ function calc(o){
   const fis=orc?o.etapas.reduce((s,e)=>s+(e.orcado||0)*(e.fisico||0)/100,0)/orc
     :(o.etapas.length?o.etapas.reduce((s,e)=>s+(e.fisico||0),0)/o.etapas.length/100:0);
   const fin=orc?comp/orc:0;
-  // Custo projetado ao final (EAC = custo realizado / % físico concluído).
-  const eac=fis>=0.05?Math.round(comp/fis):null;
-  const custoFinal=eac??Math.max(orc,comp);
+  // Custo projetado ao final: each stage costs what was budgeted, or what was
+  // already spent if that is more; spending with no stage is added on top.
+  const eac=o.etapas.reduce((s,e)=>s+Math.max(e.orcado||0,porEtapa[e.id]||0),0)+(porEtapa['']||0);
+  const custoFinal=eac;
   const contrato=o.contrato||0;
   return {orc,pago,pend,comp,rec,arec,venc,nVenc,prox,nProx,porEtapa,porCat,porForn,fis,fin,eac,
     saldoOrc:orc-comp,caixa:rec-pago,contrato,margem:contrato?contrato-custoFinal:null,custoM2:o.area?Math.round(comp/o.area):null};
@@ -591,7 +592,7 @@ function renderPainel(o,c){
     ${card('Orçamento total',fmt(c.orc),'',`${o.etapas.length} etapas${o.area?` · ${fmt(Math.round(c.orc/o.area))}/m²`:''}`)}
     ${card('Custo realizado',fmt(c.comp),'neg',`Pago ${fmt(c.pago)} · a pagar ${fmt(c.pend)}`)}
     ${card('Saldo do orçamento',fmt(c.saldoOrc),c.saldoOrc>=0?'pos':'neg',c.orc?`${pct(c.fin)} do orçamento consumido`:'Defina o orçamento por etapa')}
-    ${card('Custo projetado ao final',c.eac!==null?fmt(c.eac):'—',c.eac!==null&&c.orc&&c.eac>c.orc?'neg':'',c.eac!==null?`Desvio ${fmt(c.eac-c.orc)} vs. orçado`:'Disponível a partir de 5% de avanço físico')}
+    ${card('Custo projetado ao final',fmt(c.eac),c.orc&&c.eac>c.orc?'neg':'',c.eac>c.orc?`${fmt(c.eac-c.orc)} acima do orçado (etapas estouradas)`:'Orçado de cada etapa, ou o gasto se já passou')}
     ${card('Recebido do cliente',fmt(c.rec),'pos',`A receber ${fmt(c.arec)}${c.contrato?` · contrato ${fmt(c.contrato)}`:''}`)}
     ${card('Saldo disponível',fmt(c.caixa),c.caixa>=0?'pos':'neg',`Entradas recebidas − pagamentos · previsto ${fmt(c.caixa+c.arec-c.pend)}`)}
     ${card('Margem prevista',c.margem!==null?fmt(c.margem):'—',c.margem===null?'':c.margem>=0?'pos':'neg',c.margem!==null&&c.contrato?`${pct(c.margem/c.contrato)} do contrato`:'Informe o valor do contrato na obra')}

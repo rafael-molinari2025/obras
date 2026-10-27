@@ -1,7 +1,7 @@
 // Service worker: lets the app open offline (data is cached in localStorage and
 // synced to Supabase when the connection returns). Bump CACHE on every change
 // to the app shell so installed copies pick up the new version.
-const CACHE='obras-v4';
+const CACHE='obras-v5';
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',e=>{
