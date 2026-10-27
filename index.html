@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Controle financeiro de obras: orçamento por etapa, lançamentos, contas a pagar/receber, avanço físico x financeiro e curva S.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Obras">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Controle de Obras</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha256-0q+JdOlScWOHcunpUk21uab1jW7C1deBQARHtKMcaB4=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js" integrity="sha256-+95SqrFwCjswgIeueLQftRkuepUtgdXQgjh2POMkXdg=" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#1a2130; --panel2:#222b3d; --line:#2e3a52;
+    --txt:#e6ebf5; --muted:#8b97ad; --accent:#f59f2a; --accent2:#4f8cff; --green:#2ecc71;
+    --red:#ff5d6c; --yellow:#f5c451; --shadow:0 6px 24px rgba(0,0,0,.35);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:14px;min-height:100vh}
+  header{background:linear-gradient(135deg,#2a2214,#0f1420);padding:14px 20px;padding-top:max(14px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:20}
+  header h1{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .hdr-mid{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;max-width:520px}
+  .hdr-mid select{flex:1}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:.15s;font-family:inherit;white-space:nowrap}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#1d1305;font-weight:700}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--red)}
+  button.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+  button.sm{padding:4px 9px;font-size:12px}
+  button.link{background:none;border:none;color:var(--accent2);padding:2px 4px}
+  input,select,textarea{background:var(--panel2);color:var(--txt);border:1px solid var(--line);padding:9px 11px;border-radius:8px;font-size:14px;font-family:inherit;width:100%}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+  .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .sync .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .sync.busy .dot{background:var(--yellow)} .sync.off .dot{background:var(--red)}
+  .wrap{max-width:1400px;margin:0 auto;padding:18px 20px 40px}
+  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);overflow-x:auto}
+  .tab{padding:10px 16px;cursor:pointer;color:var(--muted);border:none;border-bottom:2px solid transparent;font-weight:600;background:none;border-radius:0;display:flex;align-items:center;gap:6px;font-size:14px}
+  .tab:hover{border-color:transparent;color:var(--txt)}
+  .tab.active{color:var(--txt);border-bottom-color:var(--accent)}
+  .tab .ic{font-size:16px}
+  .view{display:none} .view.active{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .card .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .card .val{font-size:22px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .card .sub{color:var(--muted);font-size:12px;margin-top:4px}
+  .pos{color:var(--green)} .neg{color:var(--red)} .warn{color:var(--yellow)} .mut{color:var(--muted)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px}
+  .panel>h3{font-size:14px;padding:14px 16px 0;color:var(--txt);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .panel .pbody{padding:14px 16px}
+  .grids{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:900px){.grids{grid-template-columns:1fr}}
+  .tblwrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:var(--panel2);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover td{background:var(--panel2)}
+  tr.total td{font-weight:700;background:var(--panel2);border-top:2px solid var(--line)}
+  tr.click{cursor:pointer}
+  td.wrap-t{white-space:normal;min-width:180px}
+  .bar{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;min-width:80px;position:relative}
+  .bar>i{display:block;height:100%;background:var(--s1);border-radius:4px}
+  .bar>i.over{background:var(--red)}
+  .bar.fis>i{background:var(--s3)}
+  .duo{display:grid;grid-template-columns:90px 1fr 56px;gap:8px;align-items:center;margin:6px 0;font-size:12px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line)}
+  .pill.pago{color:var(--green);border-color:rgba(46,204,113,.4)}
+  .pill.pend{color:var(--yellow);border-color:rgba(245,196,81,.4)}
+  .pill.venc{color:var(--red);border-color:rgba(255,93,108,.5)}
+  .pill.ent{color:var(--s1);border-color:rgba(57,135,229,.5)}
+  .alerts{display:flex;flex-direction:column;gap:8px}
+  .alert{padding:10px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--yellow);font-size:13px}
+  .alert.crit{border-left-color:var(--red)} .alert.ok{border-left-color:var(--green)}
+  .filters{display:grid;grid-template-columns:2fr repeat(5,1fr);gap:8px;padding:14px 16px 0}
+  @media(max-width:900px){.filters{grid-template-columns:1fr 1fr}.filters .q{grid-column:1/-1}}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+  .chartbox h3{font-size:14px;margin-bottom:4px}
+  .chartbox .hint{margin:0 0 12px}
+  .chartbox .cv{position:relative;height:300px}
+  .hint{color:var(--muted);font-size:12px;margin:8px 2px 0}
+  .empty{text-align:center;padding:50px 20px;color:var(--muted)}
+  .empty h2{color:var(--txt);margin-bottom:8px}
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:#03260f;padding:10px 20px;border-radius:8px;font-weight:600;transition:.3s;opacity:0;z-index:100;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .toast.err{background:var(--red);color:#fff}
+  .fab{display:none;position:fixed;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;font-size:28px;line-height:1;padding:0;z-index:30;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:14px;padding:0;width:min(640px,calc(100% - 24px));max-height:calc(100% - 24px);box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  dialog form{display:flex;flex-direction:column;max-height:calc(100vh - 24px)}
+  .dhead{padding:16px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+  .dbody{padding:16px 18px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .dbody .full{grid-column:1/-1}
+  .dfoot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .dfoot .left{margin-right:auto}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg label{flex:1;margin:0;text-align:center;padding:9px;cursor:pointer;font-size:13px;color:var(--muted);background:var(--panel2)}
+  .seg input{display:none}
+  .seg input:checked+span{color:var(--txt);font-weight:700}
+  .seg label:has(input:checked){background:var(--accent);}
+  .seg label:has(input:checked) span{color:#1d1305}
+  .totalbox{background:var(--panel2);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+  .totalbox b{font-size:18px}
+  .authgate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .authgate[hidden]{display:none}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:var(--shadow);width:100%;max-width:360px}
+  .authcard h2{font-size:18px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .authcard input{margin-top:10px}
+  .authactions{display:flex;gap:8px;margin-top:14px}
+  .authactions button{flex:1}
+  .authcard a{color:var(--accent);text-decoration:none}
+  .obralist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .obracard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow);cursor:pointer}
+  .obracard.sel{border-color:var(--accent)}
+  .obracard h4{font-size:15px;margin-bottom:2px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;margin-top:6px;color:var(--muted)}
+  .kv b{color:var(--txt);font-variant-numeric:tabular-nums}
+  .so{display:none}
+  .fis-in{width:72px;padding:5px 6px;text-align:right}
+  @media(max-width:760px){
+    header{padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top))}
+    header h1 .t{display:none}
+    .hdr-mid{order:3;flex-basis:100%;max-width:none}
+    .actions .hide-m{display:none}
+    .wrap{padding:12px 12px 100px}
+    .tabs{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);border-bottom:none;margin:0;z-index:25;justify-content:space-around;padding-bottom:env(safe-area-inset-bottom)}
+    .tab{flex-direction:column;gap:2px;font-size:10px;padding:8px 4px;border-bottom:none;border-top:2px solid transparent;flex:1}
+    .tab.active{border-top-color:var(--accent)}
+    .tab .ic{font-size:20px}
+    .fab{display:block}
+    .card .val{font-size:16px}
+    .dbody{grid-template-columns:1fr}
+    .hm{display:none}
+    .so{display:block!important}
+    .cards{grid-template-columns:1fr 1fr;gap:8px}
+    .card{padding:10px 12px}
+    .card .sub{font-size:11px}
+    td.wrap-t{min-width:0;white-space:normal}
+    .bar{min-width:50px}
+    th,td{padding:8px 6px}
+    .chartbox .cv{height:260px}
+  }
+  @media print{
+    header,.tabs,.fab,.noprint,.filters{display:none!important}
+    body{background:#fff;color:#000}
+    .panel,.card,.chartbox{box-shadow:none;border-color:#ccc;background:#fff;break-inside:avoid}
+    .view{display:block!important} .view:not(.active){display:none!important}
+    th{background:#eee;color:#333} td{color:#000}
+  }
+</style>
+</head>
+<body>
+<div class="authgate" id="authGate">
+  <div class="authcard">
+    <h2>🏗️ Controle de Obras</h2>
+    <p class="hint">Entre com e-mail e senha. Use o mesmo login em todos os aparelhos (escritório e canteiro) para ver os mesmos dados.</p>
+    <input type="email" id="authEmail" placeholder="E-mail" autocomplete="username">
+    <input type="password" id="authPass" placeholder="Senha" autocomplete="current-password">
+    <div class="authactions">
+      <button class="primary" onclick="authSignIn()">Entrar</button>
+      <button onclick="authSignUp()">Criar conta</button>
+    </div>
+    <p class="hint"><a href="#" onclick="authForgotPassword();return false;">Esqueci minha senha</a></p>
+    <p class="hint" id="authMsg"></p>
+  </div>
+</div>
+
+<div class="authgate" id="resetGate" hidden>
+  <div class="authcard">
+    <h2>🔑 Nova senha</h2>
+    <p class="hint">Digite uma nova senha para sua conta.</p>
+    <input type="password" id="newPass" placeholder="Nova senha" autocomplete="new-password">
+    <div class="authactions"><button class="primary" onclick="authUpdatePassword()">Salvar nova senha</button></div>
+    <p class="hint" id="resetMsg"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+<header>
+  <h1>🏗️ <span class="t">Controle de Obras</span></h1>
+  <div class="hdr-mid">
+    <select id="obraSel" onchange="selectObra(this.value)" aria-label="Obra selecionada"></select>
+    <button class="sm" onclick="openObra(curObra())" title="Editar dados da obra" id="btnEditObra">✎</button>
+  </div>
+  <div class="actions">
+    <span class="sync" id="syncSt"><span class="dot"></span><span id="syncTxt">Sincronizado</span></span>
+    <button class="primary hide-m" onclick="openLanc()">+ Lançamento</button>
+    <button onclick="openObra()">+ Obra</button>
+    <button onclick="logout()">Sair</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-v="v-painel"><span class="ic">📊</span>Painel</button>
+    <button class="tab" data-v="v-lanc"><span class="ic">🧾</span>Lançamentos</button>
+    <button class="tab" data-v="v-orc"><span class="ic">📐</span>Orçamento</button>
+    <button class="tab" data-v="v-contas"><span class="ic">📅</span>Contas</button>
+    <button class="tab" data-v="v-rel"><span class="ic">📈</span>Relatórios</button>
+    <button class="tab" data-v="v-obras"><span class="ic">🏘️</span>Obras</button>
+  </nav>
+
+  <div id="noObra" class="empty" hidden>
+    <h2>Nenhuma obra cadastrada</h2>
+    <p>Cadastre sua primeira obra para começar a controlar orçamento, gastos e recebimentos.</p>
+    <p style="margin-top:16px"><button class="primary" onclick="openObra()">+ Cadastrar obra</button></p>
+  </div>
+
+  <section class="view active" id="v-painel"></section>
+  <section class="view" id="v-lanc"></section>
+  <section class="view" id="v-orc"></section>
+  <section class="view" id="v-contas"></section>
+  <section class="view" id="v-rel"></section>
+  <section class="view" id="v-obras"></section>
+</div>
+<button class="fab primary" onclick="openLanc()" aria-label="Novo lançamento">+</button>
+</div>
+
+<!-- Lançamento -->
+<dialog id="dlgLanc">
+  <form method="dialog" onsubmit="return false">
+    <div class="dhead"><span id="lTitle">Novo lançamento</span><button type="button" class="sm" onclick="dlgLanc.close()">✕</button></div>
+    <div class="dbody">
+      <div class="full seg">
+        <label><input type="radio" name="lTipo" value="s" checked onchange="lancTipoChanged()"><span>⬇ Saída (gasto)</span></label>
+        <label><input type="radio" name="lTipo" value="e" onchange="lancTipoChanged()"><span>⬆ Entrada (recebimento)</span></label>
+      </div>
+      <div class="full"><label>Descrição *</label><input id="lDesc" placeholder="Ex.: Cimento CP-II 50kg" autocomplete="off"></div>
+      <div><label>Data</label><input type="date" id="lData"></div>
+      <div><label id="lCatLbl">Categoria</label><select id="lCat"></select></div>
+      <div id="lEtapaBox"><label>Etapa</label><select id="lEtapa"></select></div>
+      <div><label id="lFornLbl">Fornecedor</label><input id="lForn" list="fornList" autocomplete="off"><datalist id="fornList"></datalist></div>
+      <div><label>Quantidade</label><input id="lQtd" inputmode="decimal" placeholder="1" oninput="lancCalc()"></div>
+      <div><label>Unidade</label><input id="lUn" list="unList" placeholder="un, m², m³, sc, h…" autocomplete="off"><datalist id="unList"><option>un</option><option>m</option><option>m²</option><option>m³</option><option>kg</option><option>sc</option><option>t</option><option>h</option><option>dia</option><option>mês</option><option>vb</option><option>milheiro</option></datalist></div>
+      <div><label>Valor unitário (R$)</label><input id="lUnit" inputmode="decimal" placeholder="0,00" oninput="lancCalc()"></div>
+      <div><label>Valor total (R$) *</label><input id="lValor" inputmode="decimal" placeholder="0,00" oninput="lancManual=true;lancShowTotal()"></div>
+      <div class="full totalbox"><span class="mut">Total do lançamento</span><b id="lTotal">R$ 0,00</b></div>
+      <div><label>Situação</label><select id="lStatus" onchange="lancStatusChanged()"><option value="pago">Pago / Recebido</option><option value="pend">Pendente (a pagar / a receber)</option></select></div>
+      <div id="lVencBox"><label>Vencimento</label><input type="date" id="lVenc"></div>
+      <div id="lPgBox"><label>Data do pagamento</label><input type="date" id="lPg"></div>
+      <div><label>Forma de pagamento</label><select id="lForma"><option></option><option>PIX</option><option>Dinheiro</option><option>Boleto</option><option>Transferência</option><option>Cartão de crédito</option><option>Cartão de débito</option><option>Cheque</option></select></div>
+      <div><label>Nº nota fiscal / recibo</label><input id="lDoc" autocomplete="off"></div>
+      <div class="full"><label>Observações</label><textarea id="lObs" rows="2"></textarea></div>
+      <p class="hint full" id="lErr" style="color:var(--red)"></p>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="danger left" id="lDel" onclick="delLanc()">Excluir</button>
+      <button type="button" id="lDup" onclick="saveLanc('dup')">Duplicar</button>
+      <button type="button" id="lNext" onclick="saveLanc('next')">Salvar e novo</button>
+      <button type="button" class="primary" onclick="saveLanc()">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Obra -->
+<dialog id="dlgObra">
+  <form method="dialog" onsubmit="return false">
+    <div class="dhead"><span id="oTitle">Nova obra</span><button type="button" class="sm" onclick="dlgObra.close()">✕</button></div>
+    <div class="dbody">
+      <div class="full"><label>Nome da obra *</label><input id="oNome" placeholder="Ex.: Residência Silva" autocomplete="off"></div>
+      <div><label>Cliente / contratante</label><input id="oCliente" autocomplete="off"></div>
+      <div><label>Responsável técnico</label><input id="oResp" autocomplete="off"></div>
+      <div class="full"><label>Endereço</label><input id="oEnd" autocomplete="off"></div>
+      <div><label>Início</label><input type="date" id="oIni"></div>
+      <div><label>Término previsto</label><input type="date" id="oFim"></div>
+      <div><label>Valor do contrato (R$)</label><input id="oContrato" inputmode="decimal" placeholder="0,00"></div>
+      <div><label>Área construída (m²)</label><input id="oArea" inputmode="decimal" placeholder="0"></div>
+      <div><label>Status</label><select id="oStatus"><option value="plan">Planejamento</option><option value="and">Em andamento</option><option value="pausa">Pausada</option><option value="conc">Concluída</option></select></div>
+      <div id="oPadraoBox"><label>&nbsp;</label><label style="display:flex;gap:8px;align-items:center;color:var(--txt);font-size:13px;margin-top:10px"><input type="checkbox" id="oPadrao" checked style="width:auto"> Criar etapas padrão</label></div>
+      <div class="full"><label>Observações</label><textarea id="oObs" rows="2"></textarea></div>
+      <p class="hint full" id="oErr" style="color:var(--red)"></p>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="danger left" id="oDel" onclick="delObra()">Excluir obra</button>
+      <button type="button" class="primary" onclick="saveObra()">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Etapa -->
+<dialog id="dlgEtapa">
+  <form method="dialog" onsubmit="return false">
+    <div class="dhead"><span id="eTitle">Nova etapa</span><button type="button" class="sm" onclick="dlgEtapa.close()">✕</button></div>
+    <div class="dbody">
+      <div class="full"><label>Nome da etapa *</label><input id="eNome" autocomplete="off"></div>
+      <div><label>Valor orçado (R$)</label><input id="eOrc" inputmode="decimal" placeholder="0,00"></div>
+      <div><label>Avanço físico (%)</label><input id="eFis" inputmode="decimal" placeholder="0"></div>
+      <div><label>Início previsto</label><input type="date" id="eIni"></div>
+      <div><label>Fim previsto</label><input type="date" id="eFim"></div>
+      <p class="hint full">As datas da etapa distribuem o valor orçado ao longo dos meses na curva S (planejado). Sem datas, usa-se o prazo da obra.</p>
+      <p class="hint full" id="eErr" style="color:var(--red)"></p>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="danger left" id="eDel" onclick="delEtapa()">Excluir etapa</button>
+      <button type="button" class="primary" onclick="saveEtapa()">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="imp" hidden accept=".json" onchange="importJSON(event)">
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL='https://julldjybvusexwbzpaox.supabase.co';
+const SUPABASE_KEY='sb_publishable_fIDgc8-HO0wD3RT4ug5gHg_EMN_ZfrR';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const TABLE='obras_data';
+const CACHE_PREFIX='obras_cache_v1_';
+
+const CATS_S=['Material','Mão de obra','Equipamentos / locação','Serviços terceirizados','Projetos e taxas','Transporte / frete','Administração','Outros'];
+const CATS_E=['Medição / parcela do contrato','Aporte do cliente','Financiamento','Outros'];
+const ETAPAS_PADRAO=['Serviços preliminares','Fundação','Estrutura','Alvenaria','Cobertura','Instalações elétricas','Instalações hidrossanitárias','Esquadrias','Revestimentos','Pisos','Pintura','Louças e metais','Limpeza e entrega'];
+const STATUS_OBRA={plan:'Planejamento',and:'Em andamento',pausa:'Pausada',conc:'Concluída'};
+const SERIES=['#3987e5','#d95926','#199e70','#c98500','#d55181','#008300','#9085e9','#e66767'];
+const MES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// Every money value is stored as an integer number of centavos so sums never
+// pick up floating-point drift.
+let data=emptyData();
+let currentUser=null, rev=0, dirty=false, editSeq=0, syncing=false, syncTimer=null;
+let sel=null, curTab='v-painel';
+let filt={q:'',tipo:'',etapa:'',cat:'',status:'',mes:''};
+let contasTodas=false;
+
+function emptyData(){return {v:1,obras:[],del:{}};}
+function uid(){return (crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10));}
+function pad(n){return String(n).padStart(2,'0');}
+function today(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function addDays(s,n){const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmt(c){return ((c||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function fmtN(c){return ((c||0)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function num(v){const n=parseFloat(String(v??'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'));return isNaN(n)?0:n;}
+function cents(v){return Math.round(num(v)*100);}
+function pct(x,d=1){return ((isFinite(x)?x:0)*100).toLocaleString('pt-BR',{maximumFractionDigits:d})+'%';}
+function fdate(s){if(!s)return '—';const [y,m,d]=s.split('-');return `${d}/${m}/${y}`;}
+function mkey(s){return s?s.slice(0,7):'';}
+function mlabel(k){const [y,m]=k.split('-');return MES[+m-1]+'/'+y.slice(2);}
+function $(id){return document.getElementById(id);}
+function toast(msg,err){const t=$('toast');t.textContent=msg;t.classList.toggle('err',!!err);t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
+
+// ---------- Persistência & sincronização ----------
+function cacheKey(){return CACHE_PREFIX+(currentUser?currentUser.id:'anon');}
+function saveLocal(){
+  try{localStorage.setItem(cacheKey(),JSON.stringify({data,rev,dirty}));}catch(e){}
+}
+function loadLocal(){
+  try{const s=JSON.parse(localStorage.getItem(cacheKey()));if(s&&s.data){data=s.data;rev=s.rev||0;dirty=!!s.dirty;return;}}catch(e){}
+  data=emptyData();rev=0;dirty=false;
+}
+function commit(){editSeq++;dirty=true;saveLocal();render();scheduleSync();}
+function scheduleSync(ms=600){clearTimeout(syncTimer);syncTimer=setTimeout(sync,ms);}
+
+// Merge two copies of the data by record id: newest `u` timestamp wins per
+// record, and anything listed in the `del` tombstones is dropped. This lets two
+// devices edit offline and still converge without losing each other's entries.
+function mergeList(a,b,dels,deep){
+  const m=new Map();
+  for(const x of [...(a||[]),...(b||[])]){
+    if(!x||dels[x.id])continue;
+    const y=m.get(x.id);
+    m.set(x.id,!y?x:deep?deep(y,x):((x.u||0)>(y.u||0)?x:y));
+  }
+  return [...m.values()];
+}
+function mergeData(a,b){
+  const dels=Object.assign({},b&&b.del,a&&a.del);
+  return {v:1,del:dels,obras:mergeList(a&&a.obras,b&&b.obras,dels,(x,y)=>{
+    const base=(y.u||0)>(x.u||0)?y:x;
+    return {...base,etapas:mergeList(x.etapas,y.etapas,dels),lanc:mergeList(x.lanc,y.lanc,dels)};
+  })};
+}
+
+function setSync(st,txt){const el=$('syncSt');el.className='sync '+(st||'');$('syncTxt').textContent=txt;}
+async function sync(){
+  if(!currentUser)return;
+  if(syncing){scheduleSync();return;}
+  if(!navigator.onLine){setSync('off',dirty?'Offline · salvo no aparelho':'Offline');return;}
+  syncing=true; setSync('busy',dirty?'Salvando…':'Atualizando…');
+  const before=JSON.stringify(data);
+  try{
+    for(let i=0;i<5;i++){
+      const seq=editSeq;
+      const {data:row,error}=await sb.from(TABLE).select('data,rev').eq('user_id',currentUser.id).maybeSingle();
+      if(error)throw error;
+      if(!row){
+        const snap=data;
+        const {error:e2}=await sb.from(TABLE).insert({user_id:currentUser.id,data:snap,rev:1});
+        if(e2){if(e2.code==='23505')continue;throw e2;}
+        rev=1; if(editSeq===seq)dirty=false; break;
+      }
+      if(!dirty){data=row.data||emptyData();rev=row.rev;break;}
+      const merged=mergeData(data,row.data);
+      const {data:upd,error:e3}=await sb.from(TABLE).update({data:merged,rev:row.rev+1,updated_at:new Date().toISOString()})
+        .eq('user_id',currentUser.id).eq('rev',row.rev).select('rev');
+      if(e3)throw e3;
+      if(!upd||!upd.length)continue; // someone else wrote in between: re-read and merge again
+      rev=row.rev+1;
+      if(editSeq===seq){data=merged;dirty=false;}
+      else{data=mergeData(data,merged);}
+      break;
+    }
+    saveLocal();
+    setSync(dirty?'busy':'',dirty?'Salvando…':'Sincronizado');
+    if(dirty)scheduleSync();
+  }catch(e){
+    console.error(e);
+    setSync('off','Erro ao sincronizar · salvo no aparelho');
+    scheduleSync(15000);
+  }finally{syncing=false;}
+  if(JSON.stringify(data)!==before)render();
+}
+window.addEventListener('online',()=>sync());
+window.addEventListener('offline',()=>setSync('off',dirty?'Offline · salvo no aparelho':'Offline'));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
+setInterval(()=>{if(!document.hidden&&currentUser&&!document.querySelector('dialog[open]'))sync();},45000);
+
+// ---------- Auth ----------
+async function onAuthed(user){
+  if(currentUser&&currentUser.id===user.id)return;
+  currentUser=user;
+  $('authGate').hidden=true; $('resetGate').hidden=true; $('app').hidden=false;
+  loadLocal();
+  try{sel=localStorage.getItem(cacheKey()+'_sel');}catch(e){}
+  render();
+  sync();
+}
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='PASSWORD_RECOVERY'){
+    $('authGate').hidden=true;$('app').hidden=true;$('resetGate').hidden=false;return;
+  }
+  if(session&&session.user){setTimeout(()=>onAuthed(session.user),0);}
+  else{currentUser=null;$('app').hidden=true;$('authGate').hidden=false;}
+});
+function authErrorMsg(error){
+  const map={
+    'User already registered':'Esse e-mail já está cadastrado. Clique em "Entrar" ou em "Esqueci minha senha".',
+    'Invalid login credentials':'E-mail ou senha incorretos.',
+    'Email not confirmed':'E-mail ainda não confirmado. Verifique sua caixa de entrada.'
+  };
+  return map[error.message]||('Erro: '+error.message);
+}
+function authFields(){
+  const email=$('authEmail').value.trim(), pass=$('authPass').value, msg=$('authMsg');
+  if(!email||!pass){msg.textContent='Preencha e-mail e senha.';return null;}
+  return {email,pass,msg};
+}
+async function authSignIn(){
+  const f=authFields();if(!f)return;
+  f.msg.textContent='Entrando...';
+  const {error}=await sb.auth.signInWithPassword({email:f.email,password:f.pass});
+  f.msg.textContent=error?authErrorMsg(error):'';
+}
+async function authSignUp(){
+  const f=authFields();if(!f)return;
+  f.msg.textContent='Criando conta...';
+  const {data:d,error}=await sb.auth.signUp({email:f.email,password:f.pass});
+  if(error){f.msg.textContent=authErrorMsg(error);return;}
+  f.msg.textContent=d.session?'':'Conta criada! Verifique seu e-mail para confirmar antes de entrar.';
+}
+async function authForgotPassword(){
+  const email=$('authEmail').value.trim(), msg=$('authMsg');
+  if(!email){msg.textContent='Digite seu e-mail acima e clique em "Esqueci minha senha" de novo.';return;}
+  msg.textContent='Enviando e-mail de recuperação...';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  msg.textContent=error?authErrorMsg(error):'Enviamos um link de recuperação para o seu e-mail.';
+}
+async function authUpdatePassword(){
+  const pass=$('newPass').value, msg=$('resetMsg');
+  if(!pass){msg.textContent='Digite a nova senha.';return;}
+  if(pass.length<6){msg.textContent='A senha precisa ter pelo menos 6 caracteres.';return;}
+  msg.textContent='Salvando...';
+  const {error}=await sb.auth.updateUser({password:pass});
+  if(error){msg.textContent=authErrorMsg(error);return;}
+  msg.textContent='Senha atualizada! Redirecionando...';
+  setTimeout(()=>{location.href=location.origin+location.pathname;},1200);
+}
+async function logout(){
+  if(dirty&&!confirm('Há alterações ainda não enviadas para a nuvem. Sair mesmo assim? (Elas continuam salvas neste aparelho.)'))return;
+  await sb.auth.signOut();location.reload();
+}
+
+// ---------- Cálculos ----------
+function curObra(){return data.obras.find(o=>o.id===sel)||null;}
+function etapaNome(o,id){const e=o.etapas.find(e=>e.id===id);return e?e.nome:'Sem etapa';}
+function isVencido(l){return l.status==='pend'&&l.venc&&l.venc<today();}
+
+function calc(o){
+  const t=today(), em7=addDays(t,7);
+  const orc=o.etapas.reduce((s,e)=>s+(e.orcado||0),0);
+  let pago=0,pend=0,rec=0,arec=0,venc=0,nVenc=0,prox=0,nProx=0;
+  const porEtapa={},porCat={},porForn={};
+  for(const l of o.lanc){
+    if(l.tipo==='e'){if(l.status==='pago')rec+=l.valor;else arec+=l.valor;continue;}
+    if(l.status==='pago')pago+=l.valor;
+    else{pend+=l.valor;if(l.venc&&l.venc<t){venc+=l.valor;nVenc++;}else if(l.venc&&l.venc<=em7){prox+=l.valor;nProx++;}}
+    const ek=l.etapaId||'';porEtapa[ek]=(porEtapa[ek]||0)+l.valor;
+    const ck=l.cat||'Outros';porCat[ck]=(porCat[ck]||0)+l.valor;
+    if(l.forn){porForn[l.forn]=(porForn[l.forn]||0)+l.valor;}
+  }
+  const comp=pago+pend;
+  const fis=orc?o.etapas.reduce((s,e)=>s+(e.orcado||0)*(e.fisico||0)/100,0)/orc
+    :(o.etapas.length?o.etapas.reduce((s,e)=>s+(e.fisico||0),0)/o.etapas.length/100:0);
+  const fin=orc?comp/orc:0;
+  // Custo projetado ao final (EAC = custo realizado / % físico concluído).
+  const eac=fis>=0.05?Math.round(comp/fis):null;
+  const custoFinal=eac??Math.max(orc,comp);
+  const contrato=o.contrato||0;
+  return {orc,pago,pend,comp,rec,arec,venc,nVenc,prox,nProx,porEtapa,porCat,porForn,fis,fin,eac,
+    saldoOrc:orc-comp,caixa:rec-pago,contrato,margem:contrato?contrato-custoFinal:null,custoM2:o.area?Math.round(comp/o.area):null};
+}
+
+function alertas(o,c){
+  const a=[];
+  if(c.nVenc)a.push(['crit',`⛔ ${c.nVenc} conta(s) vencida(s) somando ${fmt(c.venc)}.`]);
+  if(c.nProx)a.push(['',`⏰ ${c.nProx} conta(s) vencem nos próximos 7 dias: ${fmt(c.prox)}.`]);
+  for(const e of o.etapas){const r=c.porEtapa[e.id]||0;if(e.orcado&&r>e.orcado)a.push(['crit',`📐 Etapa "${esc(e.nome)}" estourou o orçamento em ${fmt(r-e.orcado)} (${pct(r/e.orcado-1)} acima).`]);}
+  if(c.porEtapa[''])a.push(['',`🏷️ ${fmt(c.porEtapa[''])} em gastos sem etapa definida — classifique para melhorar a precisão.`]);
+  if(c.orc&&c.fin>c.fis+0.10)a.push(['',`📉 Gasto financeiro (${pct(c.fin)}) está adiantado em relação ao avanço físico (${pct(c.fis)}).`]);
+  if(c.eac&&c.orc&&c.eac>c.orc*1.05)a.push(['crit',`📈 Custo projetado ao final (${fmt(c.eac)}) supera o orçamento em ${fmt(c.eac-c.orc)}.`]);
+  if(c.margem!==null&&c.margem<0)a.push(['crit',`💸 Margem prevista negativa: ${fmt(c.margem)}.`]);
+  if(o.fim&&o.fim<today()&&o.status!=='conc')a.push(['crit',`📅 Prazo previsto (${fdate(o.fim)}) já passou e a obra não está concluída.`]);
+  if(!c.orc)a.push(['','📝 Informe os valores orçados das etapas na aba Orçamento para acompanhar desvios.']);
+  if(!a.length)a.push(['ok','✅ Nenhum alerta: obra dentro do orçamento e sem contas vencidas.']);
+  return a;
+}
+
+function monthsRange(o){
+  const ds=[o.inicio,o.fim,...o.lanc.map(l=>l.data),...o.etapas.flatMap(e=>[e.ini,e.fim])].filter(Boolean).sort();
+  if(!ds.length)return [mkey(today())];
+  let [y,m]=ds[0].slice(0,7).split('-').map(Number);
+  const end=ds[ds.length-1].slice(0,7), out=[];
+  for(let i=0;i<120;i++){const k=y+'-'+pad(m);out.push(k);if(k>=end)break;m++;if(m>12){m=1;y++;}}
+  return out;
+}
+function dayNum(s){return Math.floor(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/864e5);}
+// Planned spend per month: each stage's budget spread evenly over its days.
+function planejadoMensal(o,months){
+  const out=months.map(()=>0);
+  for(const e of o.etapas){
+    const ini=e.ini||o.inicio, fim=e.fim||o.fim;
+    if(!e.orcado||!ini||!fim||fim<ini)continue;
+    const a=dayNum(ini), b=dayNum(fim), tot=b-a+1;
+    months.forEach((k,i)=>{
+      const [y,m]=k.split('-').map(Number);
+      const ms=Math.floor(Date.UTC(y,m-1,1)/864e5), me=Math.floor(Date.UTC(y,m,1)/864e5)-1;
+      const ov=Math.min(b,me)-Math.max(a,ms)+1;
+      if(ov>0)out[i]+=e.orcado*ov/tot;
+    });
+  }
+  return out.map(Math.round);
+}
+
+// ---------- Render ----------
+function render(){
+  if(!currentUser)return;
+  if(!curObra()&&data.obras.length)sel=data.obras[0].id;
+  const o=curObra();
+  $('obraSel').innerHTML=data.obras.length?data.obras.map(x=>`<option value="${esc(x.id)}"${x.id===sel?' selected':''}>${esc(x.nome)}${x.status==='conc'?' (concluída)':''}</option>`).join(''):'<option>— nenhuma obra —</option>';
+  $('obraSel').disabled=!o; $('btnEditObra').disabled=!o;
+  $('noObra').hidden=!!o||curTab==='v-obras';
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===curTab&&(!!o||curTab==='v-obras')));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.v===curTab));
+  renderObras();
+  if(!o)return;
+  const c=calc(o);
+  renderPainel(o,c);renderLanc(o);renderOrc(o,c);renderContas();
+  if(curTab==='v-rel')renderRel(o,c);
+}
+
+function card(lbl,val,cls='',sub=''){return `<div class="card"><div class="lbl">${lbl}</div><div class="val ${cls}">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;}
+function bar(x,cls=''){const w=Math.max(0,Math.min(100,(x||0)*100));return `<div class="bar ${cls}"><i class="${x>1?'over':''}" style="width:${w}%"></i></div>`;}
+
+function renderPainel(o,c){
+  const recent=[...o.lanc].sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.u||0)-(a.u||0)).slice(0,8);
+  let h=`<div class="cards">
+    ${card('Orçamento total',fmt(c.orc),'',`${o.etapas.length} etapas${o.area?` · ${fmt(Math.round(c.orc/o.area))}/m²`:''}`)}
+    ${card('Custo realizado',fmt(c.comp),'neg',`Pago ${fmt(c.pago)} · a pagar ${fmt(c.pend)}`)}
+    ${card('Saldo do orçamento',fmt(c.saldoOrc),c.saldoOrc>=0?'pos':'neg',c.orc?`${pct(c.fin)} do orçamento consumido`:'Defina o orçamento por etapa')}
+    ${card('Custo projetado ao final',c.eac!==null?fmt(c.eac):'—',c.eac!==null&&c.orc&&c.eac>c.orc?'neg':'',c.eac!==null?`Desvio ${fmt(c.eac-c.orc)} vs. orçado`:'Disponível a partir de 5% de avanço físico')}
+    ${card('Recebido do cliente',fmt(c.rec),'pos',`A receber ${fmt(c.arec)}${c.contrato?` · contrato ${fmt(c.contrato)}`:''}`)}
+    ${card('Caixa da obra',fmt(c.caixa),c.caixa>=0?'pos':'neg','Recebido − pago')}
+    ${card('Margem prevista',c.margem!==null?fmt(c.margem):'—',c.margem===null?'':c.margem>=0?'pos':'neg',c.margem!==null&&c.contrato?`${pct(c.margem/c.contrato)} do contrato`:'Informe o valor do contrato na obra')}
+    ${card('Contas vencidas',fmt(c.venc),c.nVenc?'neg':'pos',`${c.nVenc} vencida(s) · ${c.nProx} vencem em 7 dias`)}
+  </div>
+  <div class="grids">
+    <div class="panel"><h3>Avanço físico × financeiro</h3><div class="pbody">
+      <div class="duo"><span>Físico</span>${bar(c.fis,'fis')}<b class="n">${pct(c.fis)}</b></div>
+      <div class="duo"><span>Financeiro</span>${bar(c.fin)}<b class="n">${pct(c.fin)}</b></div>
+      <p class="hint">Físico = média do avanço das etapas ponderada pelo valor orçado. Financeiro = custo realizado ÷ orçamento.
+      ${o.inicio&&o.fim?`<br>Prazo: ${fdate(o.inicio)} → ${fdate(o.fim)} · ${pct(prazoDecorrido(o))} do prazo decorrido.`:''}</p>
+    </div></div>
+    <div class="panel"><h3>Alertas</h3><div class="pbody alerts">${alertas(o,c).map(([k,t])=>`<div class="alert ${k}">${t}</div>`).join('')}</div></div>
+  </div>
+  <div class="panel"><h3>Orçado × realizado por etapa <button class="link noprint" onclick="goTab('v-orc')">ver orçamento →</button></h3><div class="pbody tblwrap"><table>
+    <thead><tr><th>Etapa</th><th class="n">Orçado</th><th class="n">Realizado</th><th>Consumo</th><th class="n hm">Físico</th></tr></thead><tbody>
+    ${o.etapas.map(e=>{const r=c.porEtapa[e.id]||0;const x=e.orcado?r/e.orcado:(r?2:0);return `<tr><td>${esc(e.nome)}</td><td class="n">${fmt(e.orcado)}</td><td class="n ${e.orcado&&r>e.orcado?'neg':''}">${fmt(r)}</td><td>${bar(x)}</td><td class="n hm">${(e.fisico||0).toLocaleString('pt-BR')}%</td></tr>`;}).join('')}
+    </tbody></table></div></div>
+  <div class="panel"><h3>Últimos lançamentos <button class="link noprint" onclick="goTab('v-lanc')">ver todos →</button></h3><div class="pbody tblwrap">${lancTable(o,recent,false)}</div></div>`;
+  $('v-painel').innerHTML=h;
+}
+function prazoDecorrido(o){const a=dayNum(o.inicio),b=dayNum(o.fim),t=dayNum(today());return b>a?Math.max(0,Math.min(1,(t-a)/(b-a))):0;}
+
+function statusPill(l){
+  if(l.status==='pago')return `<span class="pill pago">${l.tipo==='e'?'Recebido':'Pago'}</span>`;
+  if(isVencido(l))return `<span class="pill venc">Vencido</span>`;
+  return `<span class="pill pend">${l.tipo==='e'?'A receber':'A pagar'}</span>`;
+}
+function lancTable(o,rows,withTotal,showObra){
+  if(!rows.length)return '<p class="hint" style="padding:10px 0">Nenhum lançamento.</p>';
+  let tS=0,tE=0;
+  const body=rows.map(l=>{
+    const ob=showObra?data.obras.find(x=>x.lanc.includes(l)):o;
+    if(l.tipo==='e')tE+=l.valor;else tS+=l.valor;
+    return `<tr class="click" onclick="openLanc('${esc(l.id)}','${esc(ob.id)}')">
+      <td class="hm">${fdate(l.data)}</td>
+      ${showObra?`<td>${esc(ob.nome)}</td>`:''}
+      <td class="wrap-t">${esc(l.desc)}<div class="hint so" style="margin:2px 0 0">${fdate(l.data)}${l.tipo==='e'?'':' · '+esc(etapaNome(ob,l.etapaId))}</div>${l.qtd&&l.qtd!==1||l.un?`<div class="hint" style="margin:2px 0 0">${(l.qtd||1).toLocaleString('pt-BR')} ${esc(l.un||'')} × ${fmt(l.unit)}</div>`:''}</td>
+      <td class="hm">${l.tipo==='e'?'<span class="pill ent">Entrada</span>':esc(etapaNome(ob,l.etapaId))}</td>
+      <td class="hm">${esc(l.cat||'')}</td>
+      <td class="hm">${esc(l.forn||'')}</td>
+      <td class="n ${l.tipo==='e'?'pos':''}">${l.tipo==='e'?'+':'−'} ${fmt(l.valor)}</td>
+      <td>${statusPill(l)}${l.status==='pend'&&l.venc?`<div class="hint hm" style="margin:2px 0 0">vence ${fdate(l.venc)}</div>`:''}</td>
+    </tr>`;}).join('');
+  return `<table><thead><tr><th class="hm">Data</th>${showObra?'<th>Obra</th>':''}<th>Descrição</th><th class="hm">Etapa</th><th class="hm">Categoria</th><th class="hm">Fornecedor</th><th class="n">Valor</th><th>Situação</th></tr></thead><tbody>${body}
+  ${withTotal?`<tr class="total"><td class="hm"></td><td colspan="${showObra?6:5}" class="n" style="white-space:normal">Saídas ${fmt(tS)} · Entradas ${fmt(tE)} · Líquido</td><td class="n ${tE-tS>=0?'pos':'neg'}" colspan="1">${fmt(tE-tS)}</td></tr>`:''}</tbody></table>`;
+}
+
+function filtered(o){
+  const q=filt.q.trim().toLowerCase();
+  return o.lanc.filter(l=>{
+    if(filt.tipo&&l.tipo!==filt.tipo)return false;
+    if(filt.etapa&&(l.etapaId||'-')!==filt.etapa)return false;
+    if(filt.cat&&l.cat!==filt.cat)return false;
+    if(filt.status==='pago'&&l.status!=='pago')return false;
+    if(filt.status==='pend'&&l.status!=='pend')return false;
+    if(filt.status==='venc'&&!isVencido(l))return false;
+    if(filt.mes&&mkey(l.data)!==filt.mes)return false;
+    if(q&&![l.desc,l.forn,l.doc,l.obs,l.cat,etapaNome(o,l.etapaId)].join(' ').toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.u||0)-(a.u||0));
+}
+function renderLanc(o){
+  const v=$('v-lanc');
+  if(!v.querySelector('.filters')){
+    v.innerHTML=`<div class="panel"><h3>Lançamentos da obra <span class="actions noprint"><button class="sm" onclick="exportCSV()">⬇ CSV</button><button class="sm primary" onclick="openLanc()">+ Lançamento</button></span></h3>
+    <div class="filters">
+      <input class="q" id="fQ" placeholder="🔎 Buscar descrição, fornecedor, NF…" oninput="filt.q=this.value;renderLancBody()">
+      <select id="fTipo" onchange="filt.tipo=this.value;renderLancBody()"><option value="">Saídas e entradas</option><option value="s">Só saídas</option><option value="e">Só entradas</option></select>
+      <select id="fEtapa" onchange="filt.etapa=this.value;renderLancBody()"></select>
+      <select id="fCat" onchange="filt.cat=this.value;renderLancBody()"></select>
+      <select id="fStatus" onchange="filt.status=this.value;renderLancBody()"><option value="">Todas situações</option><option value="pago">Pagos / recebidos</option><option value="pend">Pendentes</option><option value="venc">Vencidos</option></select>
+      <input type="month" id="fMes" onchange="filt.mes=this.value;renderLancBody()" title="Filtrar por mês">
+    </div><div class="pbody tblwrap" id="lancBody"></div></div>`;
+  }
+  $('fEtapa').innerHTML='<option value="">Todas etapas</option><option value="-">Sem etapa</option>'+o.etapas.map(e=>`<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('');
+  $('fEtapa').value=filt.etapa;
+  $('fCat').innerHTML='<option value="">Todas categorias</option>'+[...CATS_S,...CATS_E.filter(x=>x!=='Outros')].map(x=>`<option>${esc(x)}</option>`).join('');
+  $('fCat').value=filt.cat;
+  renderLancBody();
+}
+function renderLancBody(){const o=curObra();if(!o)return;const rows=filtered(o);$('lancBody').innerHTML=`<p class="hint" style="margin:0 0 8px">${rows.length} de ${o.lanc.length} lançamento(s)</p>`+lancTable(o,rows,true);}
+
+function renderOrc(o,c){
+  let tO=0,tR=0;
+  const rows=o.etapas.map((e,i)=>{
+    const r=c.porEtapa[e.id]||0;tO+=e.orcado||0;tR+=r;const d=(e.orcado||0)-r;
+    return `<tr>
+      <td><span class="noprint"><button class="sm link" onclick="moveEtapa(${i},-1)" title="Subir" ${i?'':'disabled'}>▲</button><button class="sm link" onclick="moveEtapa(${i},1)" title="Descer" ${i<o.etapas.length-1?'':'disabled'}>▼</button></span> ${esc(e.nome)}</td>
+      <td class="n">${fmt(e.orcado)}</td><td class="n">${c.orc?pct((e.orcado||0)/c.orc):'—'}</td>
+      <td class="n">${fmt(r)}</td><td class="n ${d<0?'neg':'pos'}">${fmt(d)}</td>
+      <td>${bar(e.orcado?r/e.orcado:(r?2:0))}</td>
+      <td class="n"><input class="fis-in" inputmode="decimal" value="${(e.fisico||0).toLocaleString('pt-BR')}" onchange="setFisico('${esc(e.id)}',this.value)" aria-label="Avanço físico de ${esc(e.nome)}">%</td>
+      <td class="hm">${fdate(e.ini)} → ${fdate(e.fim)}</td>
+      <td class="noprint"><button class="sm" onclick="openEtapa('${esc(e.id)}')">Editar</button></td></tr>`;
+  }).join('');
+  const sem=c.porEtapa['']||0; tR+=sem;
+  $('v-orc').innerHTML=`<div class="cards">
+    ${card('Orçamento total',fmt(c.orc))}${card('Realizado',fmt(c.comp),'neg')}${card('Saldo',fmt(c.saldoOrc),c.saldoOrc>=0?'pos':'neg')}${card('Avanço físico',pct(c.fis),'',`Financeiro: ${pct(c.fin)}`)}
+  </div>
+  <div class="panel"><h3>Orçamento por etapa <span class="actions noprint"><button class="sm primary" onclick="openEtapa()">+ Etapa</button></span></h3><div class="pbody tblwrap"><table>
+    <thead><tr><th>Etapa</th><th class="n">Orçado</th><th class="n">% orç.</th><th class="n">Realizado</th><th class="n">Saldo</th><th>Consumo</th><th class="n">Físico</th><th class="hm">Período</th><th class="noprint"></th></tr></thead>
+    <tbody>${rows}
+    ${sem?`<tr><td class="mut">Sem etapa definida</td><td class="n">—</td><td></td><td class="n">${fmt(sem)}</td><td class="n neg">${fmt(-sem)}</td><td></td><td></td><td class="hm"></td><td class="noprint"></td></tr>`:''}
+    <tr class="total"><td>TOTAL</td><td class="n">${fmt(tO)}</td><td class="n">100%</td><td class="n">${fmt(tR)}</td><td class="n ${tO-tR>=0?'pos':'neg'}">${fmt(tO-tR)}</td><td>${bar(tO?tR/tO:0)}</td><td class="n">${pct(c.fis)}</td><td class="hm"></td><td class="noprint"></td></tr>
+    </tbody></table>
+    <p class="hint">Atualize o avanço físico (%) de cada etapa conforme a medição em campo — ele alimenta a projeção de custo final e a comparação físico × financeiro.</p></div></div>`;
+}
+
+function renderContas(){
+  const t=today();
+  const src=contasTodas?data.obras:[curObra()];
+  const all=src.flatMap(o=>o.lanc.filter(l=>l.status==='pend'));
+  const pag=all.filter(l=>l.tipo!=='e').sort((a,b)=>(a.venc||'9').localeCompare(b.venc||'9'));
+  const rec=all.filter(l=>l.tipo==='e').sort((a,b)=>(a.venc||'9').localeCompare(b.venc||'9'));
+  const sum=a=>a.reduce((s,l)=>s+l.valor,0);
+  const vencidas=pag.filter(isVencido), semana=pag.filter(l=>l.venc&&l.venc>=t&&l.venc<=addDays(t,7));
+  const tbl=(rows,tipo)=>rows.length?`<table><thead><tr><th>Vencimento</th>${contasTodas?'<th>Obra</th>':''}<th>Descrição</th><th class="hm">${tipo==='e'?'Origem':'Fornecedor'}</th><th class="n">Valor</th><th class="hm">Situação</th><th class="noprint"></th></tr></thead><tbody>${rows.map(l=>{
+      const ob=data.obras.find(x=>x.lanc.includes(l));
+      return `<tr><td>${fdate(l.venc)}</td>${contasTodas?`<td>${esc(ob.nome)}</td>`:''}<td class="wrap-t click" onclick="openLanc('${esc(l.id)}','${esc(ob.id)}')">${esc(l.desc)}</td><td class="hm">${esc(l.forn||'')}</td><td class="n">${fmt(l.valor)}${isVencido(l)?'<div class="so neg" style="font-size:11px">vencido</div>':''}</td><td class="hm">${statusPill(l)}</td>
+      <td class="noprint"><button class="sm primary" onclick="baixar('${esc(ob.id)}','${esc(l.id)}')">${tipo==='e'?'Receber':'Pagar'}</button></td></tr>`;}).join('')}
+      <tr class="total"><td colspan="${contasTodas?4:3}">TOTAL</td><td class="n">${fmt(sum(rows))}</td><td class="hm"></td><td class="noprint"></td></tr></tbody></table>`:'<p class="hint">Nada pendente. 🎉</p>';
+  $('v-contas').innerHTML=`<p class="noprint" style="margin-bottom:12px"><label style="display:flex;gap:8px;align-items:center;color:var(--txt);font-size:13px"><input type="checkbox" style="width:auto" ${contasTodas?'checked':''} onchange="contasTodas=this.checked;renderContas()"> Mostrar contas de todas as obras</label></p>
+  <div class="cards">
+    ${card('A pagar',fmt(sum(pag)),'neg',`${pag.length} conta(s)`)}
+    ${card('Vencidas',fmt(sum(vencidas)),vencidas.length?'neg':'pos',`${vencidas.length} conta(s)`)}
+    ${card('Vencem em 7 dias',fmt(sum(semana)),semana.length?'warn':'',`${semana.length} conta(s)`)}
+    ${card('A receber',fmt(sum(rec)),'pos',`${rec.length} parcela(s)`)}
+  </div>
+  <div class="panel"><h3>Contas a pagar</h3><div class="pbody tblwrap">${tbl(pag,'s')}</div></div>
+  <div class="panel"><h3>Contas a receber</h3><div class="pbody tblwrap">${tbl(rec,'e')}</div></div>`;
+}
+function baixar(oid,lid){
+  const o=data.obras.find(x=>x.id===oid);const l=o&&o.lanc.find(x=>x.id===lid);if(!l)return;
+  const d=prompt(`Data do ${l.tipo==='e'?'recebimento':'pagamento'} (dd/mm/aaaa):`,fdate(today()));
+  if(d===null)return;
+  const m=d.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m){toast('Data inválida',true);return;}
+  l.status='pago';l.pg=`${m[3]}-${pad(m[2])}-${pad(m[1])}`;l.u=Date.now();o.u=Date.now();
+  commit();toast(l.tipo==='e'?'Recebimento registrado':'Pagamento registrado');
+}
+
+function renderObras(){
+  const list=data.obras.map(o=>{const c=calc(o);return `<div class="obracard ${o.id===sel?'sel':''}" onclick="selectObra('${esc(o.id)}');goTab('v-painel')">
+    <div style="display:flex;justify-content:space-between;gap:8px"><h4>${esc(o.nome)}</h4><span class="pill">${STATUS_OBRA[o.status]||''}</span></div>
+    <div class="hint" style="margin:0 0 8px">${esc(o.cliente||'')}${o.endereco?' · '+esc(o.endereco):''}</div>
+    <div class="kv">Orçamento<b>${fmt(c.orc)}</b></div>
+    <div class="kv">Realizado<b>${fmt(c.comp)}</b></div>
+    <div class="kv">Saldo<b class="${c.saldoOrc>=0?'pos':'neg'}">${fmt(c.saldoOrc)}</b></div>
+    <div class="duo" style="grid-template-columns:70px 1fr 50px"><span>Físico</span>${bar(c.fis,'fis')}<b class="n">${pct(c.fis,0)}</b></div>
+    <div class="duo" style="grid-template-columns:70px 1fr 50px"><span>Financ.</span>${bar(c.fin)}<b class="n">${pct(c.fin,0)}</b></div>
+    ${c.nVenc?`<div class="kv neg">⛔ ${c.nVenc} conta(s) vencida(s)<b class="neg">${fmt(c.venc)}</b></div>`:''}
+  </div>`;}).join('');
+  const tot=data.obras.reduce((s,o)=>{const c=calc(o);s.orc+=c.orc;s.comp+=c.comp;s.rec+=c.rec;s.pend+=c.pend;return s;},{orc:0,comp:0,rec:0,pend:0});
+  $('v-obras').innerHTML=`<div class="cards">${card('Obras',data.obras.length,'',`${data.obras.filter(o=>o.status==='and').length} em andamento`)}${card('Orçamento somado',fmt(tot.orc))}${card('Realizado somado',fmt(tot.comp),'neg')}${card('A pagar (todas)',fmt(tot.pend),'warn')}${card('Recebido (todas)',fmt(tot.rec),'pos')}</div>
+  <div class="noprint" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="primary" onclick="openObra()">+ Nova obra</button><button onclick="exportJSON()">⬇ Backup (JSON)</button><button onclick="$('imp').click()">⬆ Importar backup</button></div>
+  <div class="obralist">${list||'<p class="hint">Nenhuma obra ainda.</p>'}</div>`;
+}
+
+// ---------- Relatórios / gráficos ----------
+let charts={};
+function renderRel(o,c){
+  const forn=Object.entries(c.porForn).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  $('v-rel').innerHTML=`<div class="noprint" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="window.print()">🖨 Imprimir / PDF</button><button onclick="exportCSV()">⬇ Lançamentos (CSV)</button><button onclick="exportJSON()">⬇ Backup (JSON)</button></div>
+  <div class="panel"><div class="pbody"><b>${esc(o.nome)}</b> ${o.cliente?'· '+esc(o.cliente):''} ${o.endereco?'· '+esc(o.endereco):''}<br><span class="hint">Relatório gerado em ${fdate(today())} · orçamento ${fmt(c.orc)} · realizado ${fmt(c.comp)} · físico ${pct(c.fis)} · financeiro ${pct(c.fin)}</span></div></div>
+  <div class="grids">
+    <div class="chartbox"><h3>Curva S — custo acumulado</h3><p class="hint">Planejado (orçamento distribuído pelo período das etapas) × realizado.</p><div class="cv"><canvas id="chS"></canvas></div></div>
+    <div class="chartbox"><h3>Fluxo de caixa mensal</h3><p class="hint">Entradas e saídas efetivamente pagas/recebidas por mês.</p><div class="cv"><canvas id="chFluxo"></canvas></div></div>
+    <div class="chartbox"><h3>Orçado × realizado por etapa</h3><p class="hint">Barras acima do orçado indicam estouro.</p><div class="cv" style="height:${Math.max(300,o.etapas.length*34+60)}px"><canvas id="chEtapa"></canvas></div></div>
+    <div class="chartbox"><h3>Gastos por categoria</h3><p class="hint">Distribuição do custo realizado.</p><div class="cv"><canvas id="chCat"></canvas></div></div>
+  </div>
+  <div class="grids" style="margin-top:18px">
+    <div class="panel"><h3>Gastos por categoria</h3><div class="pbody tblwrap"><table><thead><tr><th>Categoria</th><th class="n">Valor</th><th class="n">%</th></tr></thead><tbody>
+      ${CATS_S.filter(k=>c.porCat[k]).map(k=>`<tr><td>${esc(k)}</td><td class="n">${fmt(c.porCat[k])}</td><td class="n">${pct(c.porCat[k]/c.comp)}</td></tr>`).join('')||'<tr><td colspan="3" class="mut">Sem gastos.</td></tr>'}
+    </tbody></table></div></div>
+    <div class="panel"><h3>Maiores fornecedores</h3><div class="pbody tblwrap"><table><thead><tr><th>Fornecedor</th><th class="n">Valor</th><th class="n">%</th></tr></thead><tbody>
+      ${forn.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)}</td><td class="n">${pct(v/c.comp)}</td></tr>`).join('')||'<tr><td colspan="3" class="mut">Sem fornecedores informados.</td></tr>'}
+    </tbody></table></div></div>
+  </div>`;
+  drawCharts(o,c);
+}
+function drawCharts(o,c){
+  Object.values(charts).forEach(ch=>ch&&ch.destroy());charts={};
+  Chart.defaults.color='#8b97ad';Chart.defaults.borderColor='#2e3a52';Chart.defaults.font.family="'Segoe UI',system-ui,Arial,sans-serif";
+  const money=v=>fmt(Math.round(v*100));
+  const tip={callbacks:{label:ctx=>`${ctx.dataset.label||ctx.label}: ${money(ctx.parsed.y??ctx.parsed.x??ctx.parsed)}`}};
+  const yMoney={ticks:{callback:v=>'R$ '+(v>=1000?(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':v)},grid:{color:'#232c3f'}};
+  const months=monthsRange(o), labels=months.map(mlabel);
+
+  const plan=planejadoMensal(o,months); let a=0; const planAc=plan.map(v=>(a+=v)/100);
+  const realM=months.map(k=>o.lanc.filter(l=>l.tipo!=='e'&&mkey(l.data)===k).reduce((s,l)=>s+l.valor,0));
+  const lastK=mkey(today()); a=0; const realAc=realM.map((v,i)=>months[i]>lastK&&!v?null:(a+=v)/100);
+  charts.s=new Chart($('chS'),{type:'line',data:{labels,datasets:[
+    {label:'Planejado',data:planAc,borderColor:SERIES[0],backgroundColor:SERIES[0],borderWidth:2,borderDash:[6,4],pointRadius:0,pointHoverRadius:5,tension:.25},
+    {label:'Realizado',data:realAc,borderColor:SERIES[1],backgroundColor:SERIES[1],borderWidth:2,pointRadius:3,pointHoverRadius:6,tension:.25,spanGaps:false}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:tip},scales:{y:yMoney,x:{grid:{display:false}}}}});
+
+  const payDate=l=>l.status==='pago'?(l.pg||l.data):null;
+  const ent=months.map(k=>o.lanc.filter(l=>l.tipo==='e'&&mkey(payDate(l))===k).reduce((s,l)=>s+l.valor,0)/100);
+  const sai=months.map(k=>o.lanc.filter(l=>l.tipo!=='e'&&mkey(payDate(l))===k).reduce((s,l)=>s+l.valor,0)/100);
+  charts.f=new Chart($('chFluxo'),{type:'bar',data:{labels,datasets:[
+    {label:'Entradas',data:ent,backgroundColor:SERIES[2],borderRadius:4,borderSkipped:'start',maxBarThickness:22},
+    {label:'Saídas',data:sai,backgroundColor:SERIES[1],borderRadius:4,borderSkipped:'start',maxBarThickness:22}]},
+    options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:tip},scales:{y:yMoney,x:{grid:{display:false}}}}});
+
+  charts.e=new Chart($('chEtapa'),{type:'bar',data:{labels:o.etapas.map(e=>e.nome),datasets:[
+    {label:'Orçado',data:o.etapas.map(e=>(e.orcado||0)/100),backgroundColor:SERIES[0],borderRadius:4,borderSkipped:'start',maxBarThickness:14},
+    {label:'Realizado',data:o.etapas.map(e=>(c.porEtapa[e.id]||0)/100),backgroundColor:o.etapas.map(e=>(c.porEtapa[e.id]||0)>(e.orcado||0)&&e.orcado?SERIES[7]:SERIES[1]),borderRadius:4,borderSkipped:'start',maxBarThickness:14}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${money(ctx.parsed.x)}`}}},scales:{x:yMoney,y:{grid:{display:false}}}}});
+
+  const cats=CATS_S.filter(k=>c.porCat[k]);
+  charts.c=new Chart($('chCat'),{type:'doughnut',data:{labels:cats,datasets:[{data:cats.map(k=>c.porCat[k]/100),backgroundColor:cats.map(k=>SERIES[CATS_S.indexOf(k)]),borderColor:'#1a2130',borderWidth:2}]},
+    options:{maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${money(ctx.parsed)} (${pct(ctx.parsed*100/c.comp)})`}}}}});
+}
+
+// ---------- Navegação ----------
+function goTab(v){curTab=v;window.scrollTo(0,0);render();}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>goTab(t.dataset.v));
+function selectObra(id){sel=id;try{localStorage.setItem(cacheKey()+'_sel',id);}catch(e){}filt.etapa='';render();}
+
+// ---------- Obras ----------
+let editObraId=null;
+function openObra(o){
+  editObraId=o?o.id:null;
+  $('oTitle').textContent=o?'Editar obra':'Nova obra';
+  $('oNome').value=o?o.nome:'';$('oCliente').value=o?o.cliente||'':'';$('oResp').value=o?o.resp||'':'';
+  $('oEnd').value=o?o.endereco||'':'';$('oIni').value=o?o.inicio||'':today();$('oFim').value=o?o.fim||'':'';
+  $('oContrato').value=o&&o.contrato?fmtN(o.contrato):'';$('oArea').value=o&&o.area?o.area.toLocaleString('pt-BR'):'';
+  $('oStatus').value=o?o.status||'and':'and';$('oObs').value=o?o.obs||'':'';
+  $('oPadraoBox').hidden=!!o;$('oDel').hidden=!o;$('oErr').textContent='';
+  dlgObra.showModal();
+}
+function saveObra(){
+  const nome=$('oNome').value.trim();
+  if(!nome){$('oErr').textContent='Informe o nome da obra.';return;}
+  const ini=$('oIni').value, fim=$('oFim').value;
+  if(ini&&fim&&fim<ini){$('oErr').textContent='O término previsto não pode ser antes do início.';return;}
+  let o=data.obras.find(x=>x.id===editObraId);
+  if(!o){
+    o={id:uid(),etapas:[],lanc:[]};data.obras.push(o);
+    if($('oPadrao').checked)o.etapas=ETAPAS_PADRAO.map(n=>({id:uid(),nome:n,orcado:0,fisico:0,u:Date.now()}));
+  }
+  Object.assign(o,{nome,cliente:$('oCliente').value.trim(),resp:$('oResp').value.trim(),endereco:$('oEnd').value.trim(),inicio:ini,fim,
+    contrato:cents($('oContrato').value),area:num($('oArea').value),status:$('oStatus').value,obs:$('oObs').value.trim(),u:Date.now()});
+  dlgObra.close();selectObra(o.id);commit();toast(editObraId?'Obra atualizada':'Obra criada');
+}
+function delObra(){
+  const o=data.obras.find(x=>x.id===editObraId);if(!o)return;
+  if(prompt(`Isso apaga a obra "${o.nome}" com ${o.lanc.length} lançamento(s). Digite EXCLUIR para confirmar:`)!=='EXCLUIR')return;
+  data.del[o.id]=Date.now();data.obras=data.obras.filter(x=>x!==o);sel=null;
+  dlgObra.close();commit();toast('Obra excluída');
+}
+
+// ---------- Etapas ----------
+let editEtapaId=null;
+function openEtapa(id){
+  const o=curObra();const e=id?o.etapas.find(x=>x.id===id):null;editEtapaId=e?e.id:null;
+  $('eTitle').textContent=e?'Editar etapa':'Nova etapa';
+  $('eNome').value=e?e.nome:'';$('eOrc').value=e&&e.orcado?fmtN(e.orcado):'';$('eFis').value=e?(e.fisico||0).toLocaleString('pt-BR'):'0';
+  $('eIni').value=e?e.ini||'':'';$('eFim').value=e?e.fim||'':'';$('eDel').hidden=!e;$('eErr').textContent='';
+  dlgEtapa.showModal();
+}
+function saveEtapa(){
+  const o=curObra();const nome=$('eNome').value.trim();
+  if(!nome){$('eErr').textContent='Informe o nome da etapa.';return;}
+  const fis=num($('eFis').value);
+  if(fis<0||fis>100){$('eErr').textContent='O avanço físico deve estar entre 0 e 100%.';return;}
+  const ini=$('eIni').value, fim=$('eFim').value;
+  if(ini&&fim&&fim<ini){$('eErr').textContent='O fim previsto não pode ser antes do início.';return;}
+  let e=o.etapas.find(x=>x.id===editEtapaId);
+  if(!e){e={id:uid()};o.etapas.push(e);}
+  Object.assign(e,{nome,orcado:cents($('eOrc').value),fisico:fis,ini,fim,u:Date.now()});
+  dlgEtapa.close();commit();toast('Etapa salva');
+}
+function delEtapa(){
+  const o=curObra();const e=o.etapas.find(x=>x.id===editEtapaId);if(!e)return;
+  const n=o.lanc.filter(l=>l.etapaId===e.id).length;
+  if(!confirm(`Excluir a etapa "${e.nome}"?`+(n?`\n${n} lançamento(s) ficarão "sem etapa".`:'')))return;
+  const t=Date.now();
+  o.lanc.forEach(l=>{if(l.etapaId===e.id){l.etapaId='';l.u=t;}});
+  data.del[e.id]=t;o.etapas=o.etapas.filter(x=>x!==e);
+  dlgEtapa.close();commit();toast('Etapa excluída');
+}
+function setFisico(id,v){
+  const o=curObra();const e=o.etapas.find(x=>x.id===id);if(!e)return;
+  e.fisico=Math.max(0,Math.min(100,num(v)));e.u=Date.now();commit();
+}
+function moveEtapa(i,d){
+  const o=curObra();const j=i+d;if(j<0||j>=o.etapas.length)return;
+  [o.etapas[i],o.etapas[j]]=[o.etapas[j],o.etapas[i]];o.u=Date.now();commit();
+}
+
+// ---------- Lançamentos ----------
+let editLanc=null, lancManual=false;
+function lancTipo(){return document.querySelector('input[name=lTipo]:checked').value;}
+function lancTipoChanged(keepCat){
+  const e=lancTipo()==='e';
+  $('lEtapaBox').hidden=e;
+  $('lCatLbl').textContent=e?'Origem':'Categoria';
+  $('lFornLbl').textContent=e?'Pagador':'Fornecedor';
+  const cats=e?CATS_E:CATS_S, cur=$('lCat').value;
+  $('lCat').innerHTML=cats.map(x=>`<option>${esc(x)}</option>`).join('');
+  if(keepCat&&cats.includes(cur))$('lCat').value=cur;
+}
+function lancStatusChanged(){
+  const pend=$('lStatus').value==='pend';
+  $('lVencBox').hidden=!pend;$('lPgBox').hidden=pend;
+  if(pend&&!$('lVenc').value)$('lVenc').value=$('lData').value||today();
+  if(!pend&&!$('lPg').value)$('lPg').value=$('lData').value||today();
+}
+function lancCalc(){
+  const q=$('lQtd').value.trim(), u=$('lUnit').value.trim();
+  if(u){lancManual=false;$('lValor').value=fmtN(Math.round((q?num(q):1)*cents(u)));}
+  lancShowTotal();
+}
+function lancShowTotal(){$('lTotal').textContent=fmt(cents($('lValor').value));}
+function openLanc(id,oid){
+  if(oid&&oid!==sel)selectObra(oid);
+  const o=curObra();
+  if(!o){toast('Cadastre uma obra primeiro',true);openObra();return;}
+  const l=id?o.lanc.find(x=>x.id===id):null;editLanc=l?l.id:null;lancManual=false;
+  $('lTitle').textContent=l?'Editar lançamento':'Novo lançamento';
+  document.querySelector(`input[name=lTipo][value=${l&&l.tipo==='e'?'e':'s'}]`).checked=true;
+  lancTipoChanged();
+  $('lEtapa').innerHTML='<option value="">— Sem etapa —</option>'+o.etapas.map(e=>`<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('');
+  const forns=[...new Set(data.obras.flatMap(x=>x.lanc.map(y=>y.forn)).filter(Boolean))].sort();
+  $('fornList').innerHTML=forns.map(f=>`<option value="${esc(f)}">`).join('');
+  $('lDesc').value=l?l.desc:'';$('lData').value=l?l.data:today();
+  $('lCat').value=l&&l.cat?l.cat:$('lCat').options[0].value;
+  $('lEtapa').value=l?l.etapaId||'':(filt.etapa&&filt.etapa!=='-'?filt.etapa:'');
+  $('lForn').value=l?l.forn||'':'';
+  $('lQtd').value=l&&l.qtd?l.qtd.toLocaleString('pt-BR'):'';$('lUn').value=l?l.un||'':'';
+  $('lUnit').value=l&&l.unit?fmtN(l.unit):'';$('lValor').value=l?fmtN(l.valor):'';
+  $('lStatus').value=l?l.status:'pago';$('lVenc').value=l?l.venc||'':'';$('lPg').value=l?l.pg||'':'';
+  $('lForma').value=l?l.forma||'':'';$('lDoc').value=l?l.doc||'':'';$('lObs').value=l?l.obs||'':'';
+  $('lDel').hidden=!l;$('lDup').hidden=!l;$('lNext').hidden=!!l;$('lErr').textContent='';
+  lancStatusChanged();lancShowTotal();
+  dlgLanc.showModal();
+  if(!l)setTimeout(()=>$('lDesc').focus(),50);
+}
+function saveLanc(mode){
+  const o=curObra();
+  const desc=$('lDesc').value.trim(), valor=cents($('lValor').value), dt=$('lData').value;
+  const err=m=>{$('lErr').textContent=m;};
+  if(!desc)return err('Informe a descrição.');
+  if(!dt)return err('Informe a data.');
+  if(valor<=0)return err('Informe um valor total maior que zero.');
+  const status=$('lStatus').value;
+  if(status==='pend'&&!$('lVenc').value)return err('Informe o vencimento da conta pendente.');
+  const tipo=lancTipo();
+  const rec={tipo,desc,data:dt,cat:$('lCat').value,etapaId:tipo==='e'?'':$('lEtapa').value,forn:$('lForn').value.trim(),
+    qtd:$('lQtd').value.trim()?num($('lQtd').value):0,un:$('lUn').value.trim(),unit:cents($('lUnit').value),valor,status,
+    venc:status==='pend'?$('lVenc').value:'',pg:status==='pago'?($('lPg').value||dt):'',
+    forma:$('lForma').value,doc:$('lDoc').value.trim(),obs:$('lObs').value.trim(),u:Date.now()};
+  if(mode==='dup'){o.lanc.push({...rec,id:uid()});dlgLanc.close();commit();toast('Lançamento duplicado');return;}
+  const l=o.lanc.find(x=>x.id===editLanc);
+  if(l)Object.assign(l,rec);else o.lanc.push({...rec,id:uid()});
+  commit();toast('Lançamento salvo');
+  if(mode==='next'){
+    // Keep date/stage/category/supplier for quick entry of the next item from the same receipt.
+    ['lDesc','lQtd','lUnit','lValor','lDoc','lObs'].forEach(i=>$(i).value='');lancShowTotal();$('lErr').textContent='';$('lDesc').focus();
+  }else dlgLanc.close();
+}
+function delLanc(){
+  const o=curObra();const l=o.lanc.find(x=>x.id===editLanc);if(!l)return;
+  if(!confirm(`Excluir "${l.desc}" (${fmt(l.valor)})?`))return;
+  data.del[l.id]=Date.now();o.lanc=o.lanc.filter(x=>x!==l);dlgLanc.close();commit();toast('Lançamento excluído');
+}
+
+// ---------- Exportação ----------
+function download(name,content,type){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function slug(s){return s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w]+/g,'-').toLowerCase();}
+function exportCSV(){
+  const o=curObra();if(!o)return;
+  const rows=filtered(o);
+  const q=v=>{v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
+  const n=c=>((c||0)/100).toFixed(2).replace('.',',');
+  const lines=[['Data','Tipo','Descrição','Etapa','Categoria','Fornecedor','Quantidade','Unidade','Valor unitário','Valor total','Situação','Vencimento','Data pagamento','Forma','NF/Recibo','Obs'].map(q).join(';')];
+  rows.forEach(l=>lines.push([fdate(l.data),l.tipo==='e'?'Entrada':'Saída',l.desc,l.tipo==='e'?'':etapaNome(o,l.etapaId),l.cat,l.forn,l.qtd?String(l.qtd).replace('.',','):'',l.un,l.unit?n(l.unit):'',n(l.valor),
+    l.status==='pago'?'Pago':isVencido(l)?'Vencido':'Pendente',l.venc?fdate(l.venc):'',l.pg?fdate(l.pg):'',l.forma,l.doc,l.obs].map(q).join(';')));
+  download(`lancamentos-${slug(o.nome)}-${today()}.csv`,'﻿'+lines.join('\r\n'),'text/csv;charset=utf-8');
+  toast(`${rows.length} lançamento(s) exportado(s)`);
+}
+function exportJSON(){download(`obras-backup-${today()}.json`,JSON.stringify(data,null,2),'application/json');toast('Backup exportado');}
+function importJSON(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(!d||!Array.isArray(d.obras))throw new Error('formato');
+      if(!confirm(`Importar ${d.obras.length} obra(s)? Os dados do arquivo serão mesclados com os atuais (registros iguais ficam com a versão mais recente).`))return;
+      data=mergeData(data,{v:1,del:d.del||{},obras:d.obras});commit();toast('Backup importado');
+    }catch(e){toast('Arquivo inválido',true);}
+  };
+  rd.readAsText(f);ev.target.value='';
+}
+
+// Enter avança/salva nos formulários
+document.querySelectorAll('dialog').forEach(d=>d.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='BUTTON'){e.preventDefault();
+    if(d.id==='dlgLanc')saveLanc();else if(d.id==='dlgObra')saveObra();else saveEtapa();}
+}));
+
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
